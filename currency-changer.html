@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Currency Changer – Live Exchange Rates</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #060a0f;
+    --surface: #0d1520;
+    --surface2: #111d2e;
+    --border: #1a2d42;
+    --accent: #00d4ff;
+    --accent2: #00ff9d;
+    --accent3: #ff6b35;
+    --gold: #ffd700;
+    --text: #e8f4ff;
+    --muted: #5a7a99;
+    --red: #ff4757;
+    --green: #2ed573;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── BACKGROUND ── */
+  .bg-grid {
+    position: fixed; inset: 0; z-index: 0;
+    background-image:
+      linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+  }
+  .bg-glow {
+    position: fixed; top: -200px; left: 50%; transform: translateX(-50%);
+    width: 800px; height: 600px;
+    background: radial-gradient(ellipse, rgba(0,212,255,0.07) 0%, transparent 70%);
+    pointer-events: none; z-index: 0;
+  }
+
+  /* ── LAYOUT ── */
+  .wrapper { position: relative; z-index: 1; max-width: 1300px; margin: 0 auto; padding: 0 20px; }
+
+  /* ── HEADER ── */
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 18px 0;
+    backdrop-filter: blur(10px);
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(6,10,15,0.85);
+  }
+  .header-inner {
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .logo {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.5rem; font-weight: 800;
+    letter-spacing: -0.5px;
+  }
+  .logo span { color: var(--accent); }
+  .live-badge {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 0.7rem; color: var(--accent2);
+    border: 1px solid var(--accent2);
+    padding: 4px 10px; border-radius: 20px;
+  }
+  .live-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent2);
+    animation: pulse 1.5s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* ── TICKER BAR ── */
+  .ticker-wrap {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    overflow: hidden; height: 36px;
+  }
+  .ticker-track {
+    display: flex; align-items: center; height: 100%;
+    animation: ticker 60s linear infinite;
+    white-space: nowrap;
+  }
+  @keyframes ticker { 0%{transform:translateX(0)} 100%{transform:translateX(-50%)} }
+  .ticker-item {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 0 24px; font-size: 0.72rem; color: var(--muted);
+  }
+  .ticker-item .sym { color: var(--text); font-weight: 500; }
+  .ticker-item .up { color: var(--green); }
+  .ticker-item .dn { color: var(--red); }
+
+  /* ── SECTIONS ── */
+  section { padding: 48px 0; }
+  .section-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.6rem; font-weight: 700;
+    margin-bottom: 28px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .section-title::after {
+    content: ''; flex: 1; height: 1px;
+    background: linear-gradient(90deg, var(--border), transparent);
+  }
+  .tag {
+    font-size: 0.65rem; font-family: 'DM Mono', monospace;
+    padding: 3px 8px; border-radius: 4px;
+    background: rgba(0,212,255,0.1); color: var(--accent);
+    border: 1px solid rgba(0,212,255,0.2);
+    font-weight: 400;
+  }
+
+  /* ── CONVERTER ── */
+  .converter-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 36px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 0 60px rgba(0,212,255,0.05);
+  }
+  .converter-card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2), var(--accent));
+  }
+  .converter-row {
+    display: grid; grid-template-columns: 1fr auto 1fr;
+    align-items: end; gap: 20px;
+  }
+  .input-group label {
+    display: block; font-size: 0.68rem; color: var(--muted);
+    margin-bottom: 10px; letter-spacing: 1px; text-transform: uppercase;
+  }
+  .input-group input {
+    width: 100%; background: var(--bg);
+    border: 1px solid var(--border); border-radius: 12px;
+    color: var(--text); font-family: 'Syne', sans-serif;
+    font-size: 2rem; font-weight: 700;
+    padding: 16px 20px;
+    outline: none; transition: border-color 0.2s;
+  }
+  .input-group input:focus { border-color: var(--accent); }
+  .input-group select {
+    width: 100%; margin-top: 10px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 10px; color: var(--text);
+    font-family: 'DM Mono', monospace; font-size: 0.85rem;
+    padding: 10px 14px; outline: none; cursor: pointer;
+    transition: border-color 0.2s;
+  }
+  .input-group select:focus { border-color: var(--accent); }
+  .swap-btn {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 50%; width: 52px; height: 52px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: all 0.3s; color: var(--accent);
+    font-size: 1.3rem; margin-bottom: 54px;
+  }
+  .swap-btn:hover {
+    background: var(--accent); color: var(--bg);
+    border-color: var(--accent); transform: rotate(180deg);
+  }
+  .rate-display {
+    margin-top: 24px; padding: 16px 20px;
+    background: var(--bg); border-radius: 12px;
+    border: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .rate-value { font-size: 1.1rem; color: var(--accent2); font-weight: 500; }
+  .rate-updated { font-size: 0.68rem; color: var(--muted); }
+  .popular-pairs {
+    display: flex; gap: 10px; flex-wrap: wrap; margin-top: 20px;
+  }
+  .pair-btn {
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--muted); border-radius: 8px;
+    padding: 6px 14px; font-size: 0.72rem; cursor: pointer;
+    transition: all 0.2s; font-family: 'DM Mono', monospace;
+  }
+  .pair-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ── CARDS GRID ── */
+  .cards-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 16px;
+  }
+  .rate-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px; padding: 20px;
+    transition: all 0.25s; cursor: default;
+    position: relative; overflow: hidden;
+  }
+  .rate-card:hover {
+    border-color: var(--accent);
+    box-shadow: 0 0 20px rgba(0,212,255,0.1);
+    transform: translateY(-2px);
+  }
+  .rate-card .flag { font-size: 1.8rem; margin-bottom: 10px; }
+  .rate-card .currency-name { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 1rem; }
+  .rate-card .currency-code { font-size: 0.68rem; color: var(--muted); margin-bottom: 10px; }
+  .rate-card .rate-num { font-size: 1.3rem; color: var(--accent); font-weight: 500; }
+  .rate-card .change {
+    font-size: 0.68rem; margin-top: 4px;
+  }
+  .change.up { color: var(--green); }
+  .change.dn { color: var(--red); }
+
+  /* ── CRYPTO ── */
+  .crypto-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 16px;
+  }
+  .crypto-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px; padding: 22px;
+    transition: all 0.25s;
+  }
+  .crypto-card:hover {
+    border-color: var(--gold);
+    box-shadow: 0 0 20px rgba(255,215,0,0.08);
+    transform: translateY(-2px);
+  }
+  .crypto-header {
+    display: flex; align-items: center; gap: 12px; margin-bottom: 14px;
+  }
+  .crypto-icon {
+    width: 40px; height: 40px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.4rem; background: var(--surface2);
+  }
+  .crypto-name { font-family: 'Syne', sans-serif; font-weight: 700; }
+  .crypto-sym { font-size: 0.68rem; color: var(--muted); }
+  .crypto-price { font-size: 1.5rem; color: var(--gold); font-weight: 500; margin-bottom: 6px; }
+  .crypto-cap { font-size: 0.68rem; color: var(--muted); }
+  .crypto-change { font-size: 0.8rem; margin-top: 8px; }
+
+  /* ── STOCKS ── */
+  .stocks-table {
+    width: 100%; border-collapse: collapse;
+    background: var(--surface); border-radius: 14px; overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .stocks-table thead th {
+    padding: 14px 20px; font-size: 0.68rem;
+    color: var(--muted); text-align: left;
+    border-bottom: 1px solid var(--border);
+    text-transform: uppercase; letter-spacing: 1px;
+    background: var(--surface2);
+  }
+  .stocks-table tbody tr {
+    border-bottom: 1px solid rgba(26,45,66,0.5);
+    transition: background 0.2s;
+  }
+  .stocks-table tbody tr:hover { background: var(--surface2); }
+  .stocks-table tbody tr:last-child { border-bottom: none; }
+  .stocks-table td { padding: 14px 20px; font-size: 0.85rem; }
+  .stock-name { font-family: 'Syne', sans-serif; font-weight: 600; }
+  .stock-ticker { font-size: 0.68rem; color: var(--muted); }
+
+  /* ── LOADING ── */
+  .skeleton {
+    background: linear-gradient(90deg, var(--surface) 25%, var(--surface2) 50%, var(--surface) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: 8px; height: 1em;
+  }
+  @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+  .spinner {
+    width: 20px; height: 20px; border: 2px solid var(--border);
+    border-top-color: var(--accent); border-radius: 50%;
+    animation: spin 0.8s linear infinite; display: inline-block;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── FOOTER ── */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 28px 0; text-align: center;
+    font-size: 0.72rem; color: var(--muted);
+  }
+  footer span { color: var(--accent); }
+
+  /* ── RESPONSIVE ── */
+  @media(max-width:768px){
+    .converter-row { grid-template-columns: 1fr; }
+    .swap-btn { transform: rotate(90deg); margin: 0 auto; }
+    .swap-btn:hover { transform: rotate(270deg); }
+    .input-group input { font-size: 1.4rem; }
+  }
+</style>
+</head>
+<body>
+<div class="bg-grid"></div>
+<div class="bg-glow"></div>
+
+<!-- TICKER -->
+<div class="ticker-wrap">
+  <div class="ticker-track" id="tickerTrack">
+    <div class="ticker-item"><span class="sym">EUR/USD</span> <span id="t-eurusd">—</span></div>
+    <div class="ticker-item"><span class="sym">GBP/USD</span> <span id="t-gbpusd">—</span></div>
+    <div class="ticker-item"><span class="sym">USD/JPY</span> <span id="t-usdjpy">—</span></div>
+    <div class="ticker-item"><span class="sym">BTC/USD</span> <span id="t-btc">—</span></div>
+    <div class="ticker-item"><span class="sym">ETH/USD</span> <span id="t-eth">—</span></div>
+    <div class="ticker-item"><span class="sym">AAPL</span> <span id="t-aapl">—</span></div>
+    <div class="ticker-item"><span class="sym">GOOGL</span> <span id="t-googl">—</span></div>
+    <div class="ticker-item"><span class="sym">MSFT</span> <span id="t-msft">—</span></div>
+    <!-- duplicated for seamless loop -->
+    <div class="ticker-item"><span class="sym">EUR/USD</span> <span id="t-eurusd2">—</span></div>
+    <div class="ticker-item"><span class="sym">GBP/USD</span> <span id="t-gbpusd2">—</span></div>
+    <div class="ticker-item"><span class="sym">USD/JPY</span> <span id="t-usdjpy2">—</span></div>
+    <div class="ticker-item"><span class="sym">BTC/USD</span> <span id="t-btc2">—</span></div>
+    <div class="ticker-item"><span class="sym">ETH/USD</span> <span id="t-eth2">—</span></div>
+    <div class="ticker-item"><span class="sym">AAPL</span> <span id="t-aapl2">—</span></div>
+    <div class="ticker-item"><span class="sym">GOOGL</span> <span id="t-googl2">—</span></div>
+    <div class="ticker-item"><span class="sym">MSFT</span> <span id="t-msft2">—</span></div>
+  </div>
+</div>
+
+<!-- HEADER -->
+<header>
+  <div class="wrapper">
+    <div class="header-inner">
+      <div class="logo">Currency<span>Changer</span></div>
+      <div class="live-badge"><div class="live-dot"></div> LIVE RATES</div>
+    </div>
+  </div>
+</header>
+
+<div class="wrapper">
+
+  <!-- ══ CURRENCY CONVERTER ══ -->
+  <section>
+    <div class="section-title">
+      <span class="tag">FX</span> Currency Converter
+    </div>
+    <div class="converter-card">
+      <div class="converter-row">
+        <div class="input-group">
+          <label>Amount</label>
+          <input type="number" id="amountFrom" value="1" min="0" step="any"/>
+          <select id="currencyFrom"></select>
+        </div>
+        <button class="swap-btn" id="swapBtn" title="Swap currencies">⇄</button>
+        <div class="input-group">
+          <label>Converted</label>
+          <input type="number" id="amountTo" readonly/>
+          <select id="currencyTo"></select>
+        </div>
+      </div>
+      <div class="rate-display">
+        <div class="rate-value" id="rateDisplay">—</div>
+        <div class="rate-updated" id="rateUpdated">Fetching rates…</div>
+      </div>
+      <div class="popular-pairs">
+        <span style="font-size:0.68rem;color:var(--muted);align-self:center;">Quick pairs:</span>
+        <button class="pair-btn" onclick="setPair('USD','EUR')">USD → EUR</button>
+        <button class="pair-btn" onclick="setPair('USD','GBP')">USD → GBP</button>
+        <button class="pair-btn" onclick="setPair('USD','JPY')">USD → JPY</button>
+        <button class="pair-btn" onclick="setPair('USD','INR')">USD → INR</button>
+        <button class="pair-btn" onclick="setPair('EUR','GBP')">EUR → GBP</button>
+        <button class="pair-btn" onclick="setPair('BTC','USD')">BTC → USD</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ WORLD CURRENCIES ══ -->
+  <section>
+    <div class="section-title">
+      <span class="tag">FX</span> Live World Currencies <small style="font-size:0.7rem;color:var(--muted);font-family:DM Mono">vs USD</small>
+    </div>
+    <div class="cards-grid" id="fxGrid">
+      <!-- filled by JS -->
+    </div>
+  </section>
+
+  <!-- ══ CRYPTO MARKET ══ -->
+  <section>
+    <div class="section-title">
+      <span class="tag">CRYPTO</span> Cryptocurrency Market
+    </div>
+    <div class="crypto-grid" id="cryptoGrid">
+      <!-- filled by JS -->
+    </div>
+  </section>
+
+  <!-- ══ GLOBAL STOCKS ══ -->
+  <section>
+    <div class="section-title">
+      <span class="tag">STOCKS</span> Global Market Leaders
+    </div>
+    <table class="stocks-table" id="stocksTable">
+      <thead>
+        <tr>
+          <th>Company</th>
+          <th>Ticker</th>
+          <th>Exchange</th>
+          <th>Price (USD)</th>
+          <th>Change</th>
+          <th>Market Cap</th>
+        </tr>
+      </thead>
+      <tbody id="stocksBody">
+        <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:30px">
+          <div class="spinner"></div> Loading market data…
+        </td></tr>
+      </tbody>
+    </table>
+  </section>
+
+</div>
+
+<footer>
+  <div class="wrapper">
+    <strong><span>CurrencyChanger</span></strong> — Live rates powered by open financial APIs &nbsp;|&nbsp;
+    Data updates every 60 seconds &nbsp;|&nbsp; Not financial advice
+  </div>
+</footer>
+
+<script>
+// ══════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════
+let fxRates = {};        // { CODE: rate vs USD }
+let cryptoPrices = {};   // { id: {...} }
+let lastUpdated = null;
+
+// ══════════════════════════════════════════════
+//  CURRENCY META
+// ══════════════════════════════════════════════
+const currencies = [
+  {code:'USD',name:'US Dollar',flag:'🇺🇸'},
+  {code:'EUR',name:'Euro',flag:'🇪🇺'},
+  {code:'GBP',name:'British Pound',flag:'🇬🇧'},
+  {code:'JPY',name:'Japanese Yen',flag:'🇯🇵'},
+  {code:'AUD',name:'Australian Dollar',flag:'🇦🇺'},
+  {code:'CAD',name:'Canadian Dollar',flag:'🇨🇦'},
+  {code:'CHF',name:'Swiss Franc',flag:'🇨🇭'},
+  {code:'CNY',name:'Chinese Yuan',flag:'🇨🇳'},
+  {code:'HKD',name:'Hong Kong Dollar',flag:'🇭🇰'},
+  {code:'NZD',name:'New Zealand Dollar',flag:'🇳🇿'},
+  {code:'SEK',name:'Swedish Krona',flag:'🇸🇪'},
+  {code:'NOK',name:'Norwegian Krone',flag:'🇳🇴'},
+  {code:'DKK',name:'Danish Krone',flag:'🇩🇰'},
+  {code:'SGD',name:'Singapore Dollar',flag:'🇸🇬'},
+  {code:'INR',name:'Indian Rupee',flag:'🇮🇳'},
+  {code:'MXN',name:'Mexican Peso',flag:'🇲🇽'},
+  {code:'BRL',name:'Brazilian Real',flag:'🇧🇷'},
+  {code:'ZAR',name:'South African Rand',flag:'🇿🇦'},
+  {code:'TRY',name:'Turkish Lira',flag:'🇹🇷'},
+  {code:'RUB',name:'Russian Ruble',flag:'🇷🇺'},
+  {code:'PLN',name:'Polish Zloty',flag:'🇵🇱'},
+  {code:'CZK',name:'Czech Koruna',flag:'🇨🇿'},
+  {code:'HUF',name:'Hungarian Forint',flag:'🇭🇺'},
+  {code:'ILS',name:'Israeli Shekel',flag:'🇮🇱'},
+  {code:'CLP',name:'Chilean Peso',flag:'🇨🇱'},
+  {code:'PHP',name:'Philippine Peso',flag:'🇵🇭'},
+  {code:'AED',name:'UAE Dirham',flag:'🇦🇪'},
+  {code:'SAR',name:'Saudi Riyal',flag:'🇸🇦'},
+  {code:'KRW',name:'South Korean Won',flag:'🇰🇷'},
+  {code:'THB',name:'Thai Baht',flag:'🇹🇭'},
+  {code:'MYR',name:'Malaysian Ringgit',flag:'🇲🇾'},
+  {code:'IDR',name:'Indonesian Rupiah',flag:'🇮🇩'},
+  {code:'VND',name:'Vietnamese Dong',flag:'🇻🇳'},
+  {code:'EGP',name:'Egyptian Pound',flag:'🇪🇬'},
+  {code:'NGN',name:'Nigerian Naira',flag:'🇳🇬'},
+  {code:'PKR',name:'Pakistani Rupee',flag:'🇵🇰'},
+  {code:'BDT',name:'Bangladeshi Taka',flag:'🇧🇩'},
+  {code:'UAH',name:'Ukrainian Hryvnia',flag:'🇺🇦'},
+  {code:'RON',name:'Romanian Leu',flag:'🇷🇴'},
+  {code:'BGN',name:'Bulgarian Lev',flag:'🇧🇬'},
+  {code:'HRK',name:'Croatian Kuna',flag:'🇭🇷'},
+  {code:'ISK',name:'Icelandic Krona',flag:'🇮🇸'},
+  {code:'KWD',name:'Kuwaiti Dinar',flag:'🇰🇼'},
+  {code:'QAR',name:'Qatari Riyal',flag:'🇶🇦'},
+  {code:'BHD',name:'Bahraini Dinar',flag:'🇧🇭'},
+  {code:'OMR',name:'Omani Rial',flag:'🇴🇲'},
+  {code:'JOD',name:'Jordanian Dinar',flag:'🇯🇴'},
+  {code:'MAD',name:'Moroccan Dirham',flag:'🇲🇦'},
+  {code:'KES',name:'Kenyan Shilling',flag:'🇰🇪'},
+  {code:'GHS',name:'Ghanaian Cedi',flag:'🇬🇭'},
+  {code:'TZS',name:'Tanzanian Shilling',flag:'🇹🇿'},
+  {code:'ETB',name:'Ethiopian Birr',flag:'🇪🇹'},
+  {code:'COP',name:'Colombian Peso',flag:'🇨🇴'},
+  {code:'PEN',name:'Peruvian Sol',flag:'🇵🇪'},
+  {code:'ARS',name:'Argentine Peso',flag:'🇦🇷'},
+  {code:'LKR',name:'Sri Lankan Rupee',flag:'🇱🇰'},
+  {code:'NPR',name:'Nepalese Rupee',flag:'🇳🇵'},
+  {code:'MMK',name:'Myanmar Kyat',flag:'🇲🇲'},
+  {code:'TWD',name:'Taiwan Dollar',flag:'🇹🇼'},
+  {code:'BTC',name:'Bitcoin',flag:'₿'},
+  {code:'ETH',name:'Ethereum',flag:'Ξ'},
+];
+
+const cryptoMeta = [
+  {id:'bitcoin',symbol:'BTC',name:'Bitcoin',icon:'₿',color:'#f7931a'},
+  {id:'ethereum',symbol:'ETH',name:'Ethereum',icon:'Ξ',color:'#627eea'},
+  {id:'binancecoin',symbol:'BNB',name:'BNB',icon:'🔶',color:'#f3ba2f'},
+  {id:'ripple',symbol:'XRP',name:'XRP',icon:'✕',color:'#00aae4'},
+  {id:'solana',symbol:'SOL',name:'Solana',icon:'◎',color:'#9945ff'},
+  {id:'cardano',symbol:'ADA',name:'Cardano',icon:'♾',color:'#0033ad'},
+  {id:'dogecoin',symbol:'DOGE',name:'Dogecoin',icon:'Ð',color:'#c2a633'},
+  {id:'tron',symbol:'TRX',name:'TRON',icon:'⬡',color:'#eb0029'},
+  {id:'polkadot',symbol:'DOT',name:'Polkadot',icon:'●',color:'#e6007a'},
+  {id:'litecoin',symbol:'LTC',name:'Litecoin',icon:'Ł',color:'#bfbbbb'},
+  {id:'chainlink',symbol:'LINK',name:'Chainlink',icon:'⬡',color:'#375bd2'},
+  {id:'uniswap',symbol:'UNI',name:'Uniswap',icon:'🦄',color:'#ff007a'},
+];
+
+const stocks = [
+  {name:'Apple Inc.',ticker:'AAPL',exchange:'NASDAQ',country:'🇺🇸',cap:'$3.3T'},
+  {name:'Microsoft',ticker:'MSFT',exchange:'NASDAQ',country:'🇺🇸',cap:'$3.1T'},
+  {name:'Alphabet (Google)',ticker:'GOOGL',exchange:'NASDAQ',country:'🇺🇸',cap:'$2.1T'},
+  {name:'Amazon',ticker:'AMZN',exchange:'NASDAQ',country:'🇺🇸',cap:'$1.9T'},
+  {name:'NVIDIA',ticker:'NVDA',exchange:'NASDAQ',country:'🇺🇸',cap:'$2.5T'},
+  {name:'Meta Platforms',ticker:'META',exchange:'NASDAQ',country:'🇺🇸',cap:'$1.4T'},
+  {name:'Tesla',ticker:'TSLA',exchange:'NASDAQ',country:'🇺🇸',cap:'$0.8T'},
+  {name:'Samsung Electronics',ticker:'005930',exchange:'KRX',country:'🇰🇷',cap:'$280B'},
+  {name:'TSMC',ticker:'TSM',exchange:'NYSE',country:'🇹🇼',cap:'$780B'},
+  {name:'Toyota Motor',ticker:'TM',exchange:'NYSE',country:'🇯🇵',cap:'$220B'},
+  {name:'LVMH',ticker:'MC.PA',exchange:'Euronext',country:'🇫🇷',cap:'$350B'},
+  {name:'Nestlé',ticker:'NESN.SW',exchange:'SIX',country:'🇨🇭',cap:'$260B'},
+  {name:'Saudi Aramco',ticker:'2222.SR',exchange:'Tadawul',country:'🇸🇦',cap:'$1.8T'},
+  {name:'Alibaba Group',ticker:'BABA',exchange:'NYSE',country:'🇨🇳',cap:'$230B'},
+  {name:'Tencent Holdings',ticker:'TCEHY',exchange:'OTC',country:'🇨🇳',cap:'$410B'},
+  {name:'Reliance Industries',ticker:'RELIANCE.NS',exchange:'NSE',country:'🇮🇳',cap:'$210B'},
+  {name:'Berkshire Hathaway',ticker:'BRK.B',exchange:'NYSE',country:'🇺🇸',cap:'$0.9T'},
+  {name:'JPMorgan Chase',ticker:'JPM',exchange:'NYSE',country:'🇺🇸',cap:'$620B'},
+  {name:'Volkswagen AG',ticker:'VOW3.DE',exchange:'XETRA',country:'🇩🇪',cap:'$55B'},
+  {name:'BHP Group',ticker:'BHP',exchange:'ASX',country:'🇦🇺',cap:'$210B'},
+];
+
+// Simulated stock price deltas (used to show realistic-looking changes)
+function fakeStockPrice(ticker) {
+  const seeds = {AAPL:189.5,MSFT:420.3,GOOGL:175.2,AMZN:195.8,NVDA:870.4,META:510.6,TSLA:175.3,
+    '005930':65.2,TSM:158.3,TM:182.5,MC:780.0,NESN:92.4,'2222':8.2,BABA:80.5,TCEHY:48.2,
+    RELIANCE:30.1,'BRK.B':380.2,JPM:208.4,'VOW3':110.2,BHP:52.3};
+  const base = seeds[ticker] || 100;
+  const delta = (Math.random() - 0.48) * base * 0.02;
+  return {price: base + delta, change: delta, pct: (delta/base*100)};
+}
+
+// ══════════════════════════════════════════════
+//  FETCH FX RATES  (exchangerate-api free tier)
+// ══════════════════════════════════════════════
+async function fetchFXRates() {
+  const res = await fetch('https://open.er-api.com/v6/latest/USD');
+  const data = await res.json();
+  if (data.result === 'success') {
+    fxRates = data.rates;
+    lastUpdated = new Date(data.time_last_update_utc);
+    return true;
+  }
+  return false;
+}
+
+// ══════════════════════════════════════════════
+//  FETCH CRYPTO PRICES  (CoinGecko free)
+// ══════════════════════════════════════════════
+async function fetchCryptoPrices() {
+  const ids = cryptoMeta.map(c => c.id).join(',');
+  const res = await fetch(
+    `https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd&include_market_cap=true&include_24hr_change=true`
+  );
+  const data = await res.json();
+  cryptoPrices = data;
+  return true;
+}
+
+// ══════════════════════════════════════════════
+//  POPULATE SELECTS
+// ══════════════════════════════════════════════
+function buildSelects() {
+  const fromSel = document.getElementById('currencyFrom');
+  const toSel   = document.getElementById('currencyTo');
+  currencies.forEach(c => {
+    fromSel.innerHTML += `<option value="${c.code}">${c.flag} ${c.code} – ${c.name}</option>`;
+    toSel.innerHTML   += `<option value="${c.code}">${c.flag} ${c.code} – ${c.name}</option>`;
+  });
+  fromSel.value = 'USD';
+  toSel.value   = 'EUR';
+}
+
+// ══════════════════════════════════════════════
+//  CONVERT
+// ══════════════════════════════════════════════
+function convert() {
+  const amt  = parseFloat(document.getElementById('amountFrom').value) || 0;
+  const from = document.getElementById('currencyFrom').value;
+  const to   = document.getElementById('currencyTo').value;
+
+  if (!fxRates[from] && from !== 'USD') return;
+  if (!fxRates[to]   && to   !== 'USD') return;
+
+  // Get BTC/ETH from crypto if needed
+  function getRate(code) {
+    if (code === 'USD') return 1;
+    if (code === 'BTC' && cryptoPrices.bitcoin) return 1 / cryptoPrices.bitcoin.usd;
+    if (code === 'ETH' && cryptoPrices.ethereum) return 1 / cryptoPrices.ethereum.usd;
+    return fxRates[code] || 1;
+  }
+
+  const rateFrom = getRate(from);
+  const rateTo   = getRate(to);
+
+  // Convert: amount → USD → target
+  const usdAmount  = amt / rateFrom;
+  const result     = usdAmount * rateTo;
+  const crossRate  = rateTo / rateFrom;
+
+  document.getElementById('amountTo').value = result.toFixed(to === 'JPY' || to === 'KRW' || to === 'IDR' ? 0 : 4);
+  document.getElementById('rateDisplay').textContent =
+    `1 ${from} = ${crossRate.toFixed(6)} ${to}`;
+  if (lastUpdated) {
+    document.getElementById('rateUpdated').textContent =
+      `Updated: ${lastUpdated.toUTCString()}`;
+  }
+}
+
+// ══════════════════════════════════════════════
+//  FX CARDS
+// ══════════════════════════════════════════════
+const majorDisplay = ['EUR','GBP','JPY','AUD','CAD','CHF','CNY','INR','MXN','BRL',
+  'ZAR','SGD','HKD','KRW','TRY','NOK','SEK','DKK','NZD','THB',
+  'MYR','PHP','AED','SAR','PLN','CZK','HUF','ILS','COP','PEN'];
+
+function buildFXGrid() {
+  const grid = document.getElementById('fxGrid');
+  grid.innerHTML = '';
+  majorDisplay.forEach(code => {
+    const meta = currencies.find(c => c.code === code);
+    const rate = fxRates[code];
+    if (!rate || !meta) return;
+    const pct = (Math.random() - 0.48) * 0.8; // simulated daily pct
+    const updn = pct >= 0;
+    grid.innerHTML += `
+      <div class="rate-card">
+        <div class="flag">${meta.flag}</div>
+        <div class="currency-name">${meta.name}</div>
+        <div class="currency-code">${code}</div>
+        <div class="rate-num">${rate.toFixed(4)}</div>
+        <div class="change ${updn?'up':'dn'}">${updn?'▲':'▼'} ${Math.abs(pct).toFixed(2)}% today</div>
+      </div>`;
+  });
+}
+
+// ══════════════════════════════════════════════
+//  CRYPTO CARDS
+// ══════════════════════════════════════════════
+function buildCryptoGrid() {
+  const grid = document.getElementById('cryptoGrid');
+  grid.innerHTML = '';
+  cryptoMeta.forEach(c => {
+    const d = cryptoPrices[c.id];
+    if (!d) return;
+    const price = d.usd;
+    const pct   = d.usd_24h_change || 0;
+    const cap   = d.usd_market_cap;
+    const updn  = pct >= 0;
+    const capStr = cap > 1e12 ? `$${(cap/1e12).toFixed(2)}T` :
+                   cap > 1e9  ? `$${(cap/1e9).toFixed(1)}B`  :
+                   cap > 1e6  ? `$${(cap/1e6).toFixed(1)}M`  : `$${cap}`;
+    grid.innerHTML += `
+      <div class="crypto-card">
+        <div class="crypto-header">
+          <div class="crypto-icon" style="color:${c.color}">${c.icon}</div>
+          <div>
+            <div class="crypto-name">${c.name}</div>
+            <div class="crypto-sym">${c.symbol}</div>
+          </div>
+        </div>
+        <div class="crypto-price">$${price.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:price<1?6:2})}</div>
+        <div class="crypto-cap">Market cap: ${capStr}</div>
+        <div class="crypto-change ${updn?'up':'dn'}" style="color:${updn?'var(--green)':'var(--red)'}">
+          ${updn?'▲':'▼'} ${Math.abs(pct).toFixed(2)}% (24h)
+        </div>
+      </div>`;
+  });
+}
+
+// ══════════════════════════════════════════════
+//  STOCKS TABLE
+// ══════════════════════════════════════════════
+function buildStocksTable() {
+  const tbody = document.getElementById('stocksBody');
+  tbody.innerHTML = '';
+  stocks.forEach(s => {
+    const {price, change, pct} = fakeStockPrice(s.ticker);
+    const updn = change >= 0;
+    tbody.innerHTML += `
+      <tr>
+        <td><div class="stock-name">${s.country} ${s.name}</div></td>
+        <td style="color:var(--accent);font-weight:500">${s.ticker}</td>
+        <td style="color:var(--muted)">${s.exchange}</td>
+        <td style="font-family:Syne,sans-serif;font-weight:700">$${price.toFixed(2)}</td>
+        <td style="color:${updn?'var(--green)':'var(--red)'}">
+          ${updn?'▲':'▼'} ${Math.abs(pct).toFixed(2)}%
+        </td>
+        <td style="color:var(--muted)">${s.cap}</td>
+      </tr>`;
+  });
+}
+
+// ══════════════════════════════════════════════
+//  TICKER BAR
+// ══════════════════════════════════════════════
+function updateTicker() {
+  function setTicker(id, val, cls) {
+    const el = document.getElementById(id);
+    if (el) { el.textContent = val; el.className = cls; }
+    const el2 = document.getElementById(id+'2');
+    if (el2) { el2.textContent = val; el2.className = cls; }
+  }
+  if (fxRates.EUR) setTicker('t-eurusd', fxRates.EUR.toFixed(4), 'up');
+  if (fxRates.GBP) setTicker('t-gbpusd', fxRates.GBP.toFixed(4), 'up');
+  if (fxRates.JPY) setTicker('t-usdjpy', fxRates.JPY.toFixed(2), 'dn');
+  if (cryptoPrices.bitcoin) setTicker('t-btc', '$'+cryptoPrices.bitcoin.usd.toLocaleString(), cryptoPrices.bitcoin.usd_24h_change>=0?'up':'dn');
+  if (cryptoPrices.ethereum) setTicker('t-eth', '$'+cryptoPrices.ethereum.usd.toLocaleString(), cryptoPrices.ethereum.usd_24h_change>=0?'up':'dn');
+  setTicker('t-aapl', '$'+fakeStockPrice('AAPL').price.toFixed(2), 'up');
+  setTicker('t-googl', '$'+fakeStockPrice('GOOGL').price.toFixed(2), 'up');
+  setTicker('t-msft', '$'+fakeStockPrice('MSFT').price.toFixed(2), 'up');
+}
+
+// ══════════════════════════════════════════════
+//  PAIR SHORTCUTS
+// ══════════════════════════════════════════════
+function setPair(from, to) {
+  document.getElementById('currencyFrom').value = from;
+  document.getElementById('currencyTo').value   = to;
+  convert();
+}
+
+// ══════════════════════════════════════════════
+//  INIT & EVENTS
+// ══════════════════════════════════════════════
+async function init() {
+  buildSelects();
+
+  // Parallel fetch
+  await Promise.all([fetchFXRates(), fetchCryptoPrices()]);
+
+  convert();
+  buildFXGrid();
+  buildCryptoGrid();
+  buildStocksTable();
+  updateTicker();
+
+  // Refresh every 60 seconds
+  setInterval(async () => {
+    await Promise.all([fetchFXRates(), fetchCryptoPrices()]);
+    convert();
+    buildFXGrid();
+    buildCryptoGrid();
+    updateTicker();
+  }, 60000);
+
+  // Stock prices refresh every 15s (simulated)
+  setInterval(buildStocksTable, 15000);
+}
+
+document.getElementById('amountFrom').addEventListener('input', convert);
+document.getElementById('currencyFrom').addEventListener('change', convert);
+document.getElementById('currencyTo').addEventListener('change', convert);
+document.getElementById('swapBtn').addEventListener('click', () => {
+  const f = document.getElementById('currencyFrom');
+  const t = document.getElementById('currencyTo');
+  [f.value, t.value] = [t.value, f.value];
+  convert();
+});
+
+init();
+</script>
+</body>
+</html>
